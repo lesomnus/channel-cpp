@@ -1,0 +1,17 @@
+{
+	"name": "channel-cpp",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"settings": {
+		"C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+		"cSpell.diagnosticLevel": "Hint"
+	},
+	"extensions": [
+		"ms-vscode.cpptools",
+		"ms-vscode.cmake-tools",
+		"twxs.cmake",
+		"matepek.vscode-catch2-test-adapter",
+		"streetsidesoftware.code-spell-checker"
+	]
+}
