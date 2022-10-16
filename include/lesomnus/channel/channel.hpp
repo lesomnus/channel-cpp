@@ -48,10 +48,19 @@ class receiver: public virtual detail::chan_base {
 		return recv(std::stop_token{}, value);
 	}
 
-	virtual void recv_sched(
-	    std::stop_token                       token,
-	    std::function<bool()> const&          need_abort,
-	    std::function<void(bool, T&&)> const& on_settle) = 0;
+	virtual void recv_sched(std::function<bool()> need_abort, std::function<void(bool, T&&)> on_settled) = 0;
+
+	void recv_sched(std::stop_token token, std::function<void(bool, T&&)> on_settled) {
+		if(token.stop_requested()) {
+			return;
+		}
+
+		recv_sched([token] { return token.stop_requested(); }, std::move(on_settled));
+	}
+
+	void recv_sched(std::function<void(bool, T&&)> on_settled) {
+		recv_sched([] { return false; }, std::move(on_settled));
+	}
 };
 
 template<typename T>
@@ -97,15 +106,37 @@ class sender: public virtual detail::chan_base {
 		return send(std::stop_token{}, std::move(value));
 	}
 
-	virtual void send_sched(
-	    std::stop_token token, T const& value,
-	    std::function<bool()> const&     need_abort,
-	    std::function<void(bool)> const& on_settle) = 0;
+	virtual void send_sched(T const& value, std::function<bool()> need_abort, std::function<void(bool)> on_settled) = 0;
 
-	virtual void send_sched(
-	    std::stop_token token, T&& value,
-	    std::function<bool()> const&     need_abort,
-	    std::function<void(bool)> const& on_settle) = 0;
+	virtual void send_sched(T&& value, std::function<bool()> need_abort, std::function<void(bool)> on_settled) = 0;
+
+	void send_sched(std::stop_token token, T const& value, std::function<void(bool, T&&)> on_settled) {
+		if(token.stop_requested()) {
+			return;
+		}
+
+		send_sched(
+		    value, [token] { return token.stop_requested(); }, std::move(on_settled));
+	}
+
+	void send_sched(std::stop_token token, T&& value, std::function<void(bool, T&&)> on_settled) {
+		if(token.stop_requested()) {
+			return;
+		}
+
+		send_sched(
+		    std::move(value), [token] { return token.stop_requested(); }, std::move(on_settled));
+	}
+
+	void send_sched(T const& value, std::function<void(bool, T&&)> on_settled) {
+		send_sched(
+		    value, [] { return false; }, std::move(on_settled));
+	}
+
+	void send_sched(T&& value, std::function<void(bool, T&&)> on_settled) {
+		send_sched(
+		    std::move(value), [] { return false; }, std::move(on_settled));
+	}
 };
 
 template<typename T>

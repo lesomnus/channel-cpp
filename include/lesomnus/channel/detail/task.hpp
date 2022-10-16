@@ -10,19 +10,9 @@ namespace detail {
 
 template<typename F>
 struct task {
-	bool is_aborted() const {
-		return token.stop_requested() || need_abort();
-	}
+	std::function<bool()> need_abort;
 
-	template<typename... Args>
-	void execute(Args&&... args) const {
-		func(std::forward<Args>(args)...);
-	}
-
-	std::stop_token              token;
-	std::function<bool()> const& need_abort;
-
-	F func;
+	F execute;
 };
 
 }  // namespace detail

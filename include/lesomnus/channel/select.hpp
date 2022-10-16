@@ -19,8 +19,17 @@ class op {
    public:
 	virtual bool try_execute() = 0;
 
-	virtual void schedule(std::stop_token token, std::function<bool()> const& need_abort) = 0;
+	virtual void schedule(std::function<bool()> need_abort) = 0;
 };
+
+namespace {
+
+struct sched_context {
+	std::mutex mutex;
+	bool       is_done = false;
+};
+
+}  // namespace
 
 }  // namespace detail
 
@@ -48,8 +57,8 @@ class recv: public detail::op {
 		return true;
 	}
 
-	void schedule(std::stop_token token, std::function<bool()> const& need_abort) override {
-		chan_.recv_sched(token, need_abort, on_settle_);
+	void schedule(std::function<bool()> need_abort) override {
+		chan_.recv_sched(std::move(need_abort), std::move(on_settle_));
 	}
 
    private:
@@ -62,10 +71,10 @@ template<typename T, typename I>
 class send: public detail::op {
    public:
 	send(
-	    sender<T>& chan, I&& value, std::function<void(bool)> const& on_settle = [](bool) {})
+	    sender<T>& chan, I&& value, std::function<void(bool)> on_settle = [](bool) {})
 	    : chan_(chan)
 	    , value_(std::forward<I>(value))
-	    , on_settle_(on_settle) { }
+	    , on_settle_(std::move(on_settle)) { }
 
 	bool try_execute() override {
 		std::error_code ec;
@@ -80,15 +89,15 @@ class send: public detail::op {
 		return true;
 	}
 
-	void schedule(std::stop_token token, std::function<bool()> const& need_abort) override {
-		chan_.send_sched(token, std::forward<I>(value_), need_abort, on_settle_);
+	void schedule(std::function<bool()> need_abort) override {
+		chan_.send_sched(std::forward<I>(value_), std::move(need_abort), std::move(on_settle_));
 	}
 
    private:
 	sender<T>& chan_;
 	I          value_;
 
-	std::function<void(bool)> const& on_settle_;
+	std::function<void(bool)> on_settle_;
 };
 
 template<class T>
@@ -119,33 +128,30 @@ void select(std::stop_token token, Ops... ops, std::function<void()> const& fall
 		return;
 	}
 
-	auto schedule = std::make_shared<std::mutex>();
-	schedule->lock();
+	auto ctx = std::make_shared<detail::sched_context>();
+	ctx->mutex.lock();
 
 	std::mutex done;
 	done.lock();
 
-	std::stop_source op_stop_source;
-
-	auto const cancel = [&done, &op_stop_source] {
-		op_stop_source.request_stop();
-
+	auto const cancel = [&ctx, &done] {
+		ctx->is_done = true;
 		done.unlock();
 	};
 
 	// TODO: merge with need_abort?
-	std::stop_callback on_cancel(token, [schedule, &cancel] {
-		std::scoped_lock l(*schedule);
-		if(schedule.unique()) {
+	std::stop_callback on_cancel(token, [ctx, &cancel] {
+		std::scoped_lock l(ctx->mutex);
+		if(ctx->is_done) {
 			return;
 		}
 
 		cancel();
 	});
 
-	std::function<bool()> const need_abort = [schedule, &cancel]() {
-		std::scoped_lock l(*schedule);
-		if(schedule.unique()) {
+	std::function<bool()> const need_abort = [ctx, &cancel]() {
+		std::scoped_lock l(ctx->mutex);
+		if(ctx->is_done) {
 			return true;
 		}
 
@@ -157,11 +163,11 @@ void select(std::stop_token token, Ops... ops, std::function<void()> const& fall
 	([&] {
 		detail::op& op = ops;
 
-		op.schedule(op_stop_source.get_token(), need_abort);
+		op.schedule(need_abort);
 	}(),
 	 ...);
 
-	schedule->unlock();
+	ctx->mutex.unlock();
 	std::scoped_lock wait(done);
 }
 

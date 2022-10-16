@@ -35,14 +35,14 @@ class bounded_channel: public chan<T> {
 
 		T v;
 		while(!hanged_recv_tasks.empty()) {
-			if(!hanged_recv_tasks.front().is_aborted()) {
+			if(!hanged_recv_tasks.front().need_abort()) {
 				break;
 			}
 
 			hanged_recv_tasks.pop();
 		}
 		while(!hanged_send_tasks.empty()) {
-			if(!hanged_send_tasks.front().is_aborted()) {
+			if(!hanged_send_tasks.front().need_abort()) {
 				break;
 			}
 
@@ -63,15 +63,15 @@ class bounded_channel: public chan<T> {
 		T v;
 		while(!hanged_recv_tasks.empty()) {
 			auto& task = hanged_recv_tasks.front();
-			if(!task.is_aborted()) {
-				hanged_recv_tasks.front().execute(false, std::move(v));
+			if(!task.need_abort()) {
+				task.execute(false, std::move(v));
 			}
 			hanged_recv_tasks.pop();
 		}
 		while(!hanged_send_tasks.empty()) {
 			auto& task = hanged_send_tasks.front();
-			if(!task.is_aborted()) {
-				hanged_send_tasks.front().execute(false, v);
+			if(!task.need_abort()) {
+				task.execute(false, v);
 			}
 			hanged_send_tasks.pop();
 		}
@@ -128,8 +128,7 @@ class bounded_channel: public chan<T> {
 		});
 
 		hanged_recv_tasks.emplace(recv_task{
-		    task_token,
-		    [] { return false; },
+		    [task_token] { return task_token.stop_requested(); },
 		    [&value, &ec, &done, &task_stop_source](bool ok, T&& src) {
 			    // `mutex_` must be locked invoke this before.
 			    // It must not be invoked if `task_token` is expired.
@@ -153,33 +152,25 @@ class bounded_channel: public chan<T> {
 	}
 
 	void recv_sched(
-	    std::stop_token                       token,
-	    std::function<bool()> const&          need_abort,
-	    std::function<void(bool, T&&)> const& on_settle) override {
+	    std::function<bool()>          need_abort,
+	    std::function<void(bool, T&&)> on_settled) override {
 		std::unique_lock l(mutex_);
-
-		if(token.stop_requested()) [[unlikely]] {
-			return;
-		}
 
 		T value;
 
 		if(is_closed_) [[unlikely]] {
-			on_settle(false, std::move(value));
+			on_settled(false, std::move(value));
 			return;
 		}
 
 		if(try_recv_(value)) {
-			on_settle(true, std::move(value));
+			on_settled(true, std::move(value));
 			return;
 		}
 
 		hanged_recv_tasks.emplace(recv_task{
-		    token,
-		    need_abort,
-		    [&on_settle](bool ok, T&& received) {
-			    on_settle(ok, std::move(received));
-		    },
+		    std::move(need_abort),
+		    std::move(on_settled),
 		});
 	}
 
@@ -200,17 +191,17 @@ class bounded_channel: public chan<T> {
 	}
 
 	void send_sched(
-	    std::stop_token token, T const& value,
-	    std::function<bool()> const&     need_abort,
-	    std::function<void(bool)> const& on_settle) override {
-		send_sched_(token, value, need_abort, on_settle);
+	    T const&                  value,
+	    std::function<bool()>     need_abort,
+	    std::function<void(bool)> on_settled) override {
+		send_sched_(value, std::move(need_abort), std::move(on_settled));
 	}
 
 	void send_sched(
-	    std::stop_token token, T&& value,
-	    std::function<bool()> const&     need_abort,
-	    std::function<void(bool)> const& on_settle) override {
-		send_sched_(token, std::move(value), need_abort, on_settle);
+	    T&&                       value,
+	    std::function<bool()>     need_abort,
+	    std::function<void(bool)> on_settled) override {
+		send_sched_(std::move(value), std::move(need_abort), std::move(on_settled));
 	}
 
    private:
@@ -224,10 +215,8 @@ class bounded_channel: public chan<T> {
 			while(!hanged_send_tasks.empty()) {
 				assert(buffer_.size() < capacity_);
 
-				auto const& task       = hanged_send_tasks.front();
-				bool const  is_aborted = task.is_aborted();
-
-				if(is_aborted) {
+				auto const& task = hanged_send_tasks.front();
+				if(task.need_abort()) {
 					hanged_send_tasks.pop();
 					continue;
 				}
@@ -245,10 +234,8 @@ class bounded_channel: public chan<T> {
 			while(!hanged_send_tasks.empty()) {
 				assert(buffer_.size() >= capacity_);
 
-				auto const& task       = hanged_send_tasks.front();
-				bool const  is_aborted = task.is_aborted();
-
-				if(is_aborted) {
+				auto const& task = hanged_send_tasks.front();
+				if(task.need_abort()) {
 					hanged_send_tasks.pop();
 					continue;
 				}
@@ -270,10 +257,8 @@ class bounded_channel: public chan<T> {
 		while(!hanged_recv_tasks.empty()) {
 			assert(buffer_.empty());
 
-			auto const& task       = hanged_recv_tasks.front();
-			bool const  is_aborted = task.is_aborted();
-
-			if(is_aborted) {
+			auto const& task = hanged_recv_tasks.front();
+			if(task.need_abort()) {
 				hanged_recv_tasks.pop();
 				continue;
 			}
@@ -348,8 +333,7 @@ class bounded_channel: public chan<T> {
 		});
 
 		hanged_send_tasks.emplace(send_task{
-		    task_token,
-		    [] { return false; },
+		    [task_token] { return task_token.stop_requested(); },
 		    [&value, &ec, &done, &task_stop_source](bool ok, T& dst) {
 			    // `mutex_` must be locked invoke this before.
 			    // It must not be invoked if `task_token` is expired.
@@ -375,33 +359,29 @@ class bounded_channel: public chan<T> {
 	template<typename U>
 	requires std::same_as<std::remove_cvref_t<U>, T>
 	void send_sched_(
-	    std::stop_token token, U&& value,
-	    std::function<bool()> const&     need_abort,
-	    std::function<void(bool)> const& on_settle) {
+	    U&&                       value,
+	    std::function<bool()>     need_abort,
+	    std::function<void(bool)> on_settled) {
 		std::unique_lock l(mutex_);
 
-		if(token.stop_requested()) [[unlikely]] {
-			return;
-		}
-
 		if(is_closed_) [[unlikely]] {
-			on_settle(false);
+			on_settled(false);
 			return;
 		}
 
 		if(try_send_(std::forward<U>(value))) {
-			on_settle(true);
+			on_settled(true);
 			return;
 		}
 
 		hanged_send_tasks.emplace(send_task{
-		    token,
-		    need_abort,
-		    [&value, &on_settle](bool ok, T& dst) {
+		    std::move(need_abort),
+		    [&value, f = std::move(on_settled)](bool ok, T& dst) {
 			    if(ok) {
 				    dst = std::forward<U>(value);
 			    }
-			    on_settle(ok);
+
+			    f(ok);
 		    },
 		});
 	}
