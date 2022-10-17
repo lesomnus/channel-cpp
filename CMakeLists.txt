@@ -20,11 +20,9 @@ set(CMAKE_CXX_STANDARD 20)
 add_library(
 	channel INTERFACE
 		include/lesomnus/channel/error.hpp
-		include/lesomnus/channel/channel.hpp
+		include/lesomnus/channel/chan.hpp
 		include/lesomnus/channel/select.hpp
-
-		include/lesomnus/channel/unbounded_channel.hpp
-		include/lesomnus/channel/bounded_channel.hpp
+		include/lesomnus/channel/channel.hpp
 
 		include/lesomnus/channel.hpp
 )

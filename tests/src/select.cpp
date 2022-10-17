@@ -72,8 +72,8 @@ TEST_CASE("select") {
 		}
 
 		SECTION("by receive") {
-			auto chan1 = bounded_channel<int>(0);
-			auto chan2 = bounded_channel<std::string>(0);
+			auto chan1 = bounded_channel<int, 0>();
+			auto chan2 = bounded_channel<std::string, 0>();
 
 			auto const  t0 = std::chrono::steady_clock::now();
 			std::string received;
@@ -102,8 +102,8 @@ TEST_CASE("select") {
 		}
 
 		SECTION("by close") {
-			auto chan1 = bounded_channel<int>(0);
-			auto chan2 = bounded_channel<std::string>(0);
+			auto chan1 = bounded_channel<int, 0>();
+			auto chan2 = bounded_channel<std::string, 0>();
 
 			auto const t0     = std::chrono::steady_clock::now();
 			auto const closer = std::jthread([&] {

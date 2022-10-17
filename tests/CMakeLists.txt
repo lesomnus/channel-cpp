@@ -36,6 +36,6 @@ macro (LESOMNUS_CHANNEL_TEST NAME)
 	catch_discover_tests(${NAME}_test)
 endmacro (LESOMNUS_CHANNEL_TEST)
 
-LESOMNUS_CHANNEL_TEST(unbounded_channel)
-LESOMNUS_CHANNEL_TEST(bounded_channel)
+LESOMNUS_CHANNEL_TEST(channel)
 LESOMNUS_CHANNEL_TEST(select)
+LESOMNUS_CHANNEL_TEST(io_bench)

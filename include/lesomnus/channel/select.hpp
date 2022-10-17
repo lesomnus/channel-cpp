@@ -8,7 +8,7 @@
 #include <system_error>
 #include <type_traits>
 
-#include "lesomnus/channel/channel.hpp"
+#include "lesomnus/channel/chan.hpp"
 
 namespace lesomnus {
 namespace channel {
