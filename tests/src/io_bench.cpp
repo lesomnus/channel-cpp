@@ -18,9 +18,9 @@ TEST_CASE("send") {
 		send(chan, 10'000);
 	};
 
-	BENCHMARK("bounded_chanel-10m") {
-		channel::bounded_channel<int, 1'000'000> chan;
-		send(chan, 1'000'000);
+	BENCHMARK("bounded_chanel-100k") {
+		channel::bounded_channel<int, 100'000> chan;
+		send(chan, 100'000);
 	};
 
 	BENCHMARK("unbounded_chanel-10k") {
@@ -28,9 +28,9 @@ TEST_CASE("send") {
 		send(chan, 10'000);
 	};
 
-	BENCHMARK("unbounded_chanel-10m") {
+	BENCHMARK("unbounded_chanel-100k") {
 		channel::bounded_channel<int, channel::unbounded_capacity> chan;
-		send(chan, 1'000'000);
+		send(chan, 100'000);
 	};
 }
 
@@ -48,9 +48,9 @@ TEST_CASE("send_sched") {
 		send_sched(static_cast<channel::chan<int>&>(chan), 10'000);
 	};
 
-	BENCHMARK("bounded_channel-1m") {
+	BENCHMARK("bounded_channel-100k") {
 		channel::bounded_channel<int, 0> chan;
-		send_sched(chan, 1'000'000);
+		send_sched(chan, 100'000);
 	};
 }
 
@@ -68,9 +68,9 @@ TEST_CASE("recv_sched") {
 		recv_sched(chan, 10'000);
 	};
 
-	BENCHMARK("bounded_channel_0-1m") {
+	BENCHMARK("bounded_channel_0-100k") {
 		channel::bounded_channel<int, 0> chan;
-		recv_sched(chan, 1'000'000);
+		recv_sched(chan, 100'000);
 	};
 
 	BENCHMARK("bounded_channel-10k") {
@@ -78,9 +78,9 @@ TEST_CASE("recv_sched") {
 		recv_sched(chan, 10'000);
 	};
 
-	BENCHMARK("bounded_channel-1m") {
+	BENCHMARK("bounded_channel-100k") {
 		channel::bounded_channel<int, 1> chan;
-		recv_sched(chan, 1'000'000);
+		recv_sched(chan, 100'000);
 	};
 
 	BENCHMARK("unbounded_channel-10k") {
@@ -88,8 +88,8 @@ TEST_CASE("recv_sched") {
 		recv_sched(chan, 10'000);
 	};
 
-	BENCHMARK("unbounded_channel-1m") {
+	BENCHMARK("unbounded_channel-100k") {
 		channel::bounded_channel<int, channel::unbounded_capacity> chan;
-		recv_sched(chan, 1'000'000);
+		recv_sched(chan, 100'000);
 	};
 }

@@ -1,10 +1,16 @@
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <shared_mutex>
 #include <stop_token>
 #include <thread>
+#include <vector>
 
+#include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <lesomnus/channel/chan.hpp>
@@ -230,4 +236,71 @@ struct UnboundedChanInitializer {
 TEST_CASE_METHOD(ChannelTestSuite<UnboundedChanInitializer>, "unbounded_channel") {
 	run_basic();
 	run_recv_blocked();
+}
+
+template<std::size_t N>
+struct V { constexpr static std::size_t v = N; };
+
+TEMPLATE_TEST_CASE("multi send recv", "", V<0>, V<1>, V<2>, V<3>, V<lesomnus::channel::unbounded_capacity>) {
+	constexpr std::size_t NumIterate = 100'000;
+
+	std::vector<std::uint8_t> marks(NumIterate, false);
+	std::atomic_uint64_t      ticket = 0;
+
+	std::shared_mutex mtx;
+	std::unique_lock  l(mtx);
+
+	auto const chan = lesomnus::channel::make_chan<std::uint64_t, TestType::v>();
+
+	auto const sender = [&] {
+		std::shared_lock l(mtx);
+
+		while(true) {
+			auto const v = ticket.fetch_add(1);
+			if(v >= NumIterate) {
+				return;
+			}
+
+			chan->send(v);
+		}
+	};
+
+	auto const recver = [&] {
+		std::shared_lock l(mtx);
+
+		while(true) {
+			std::uint64_t v;
+			if(!chan->recv(v)) {
+				return;
+			}
+
+			marks[v] = 1;
+		}
+	};
+
+	std::array<std::shared_ptr<std::jthread>, 4> senders;
+	for(auto& w: senders) {
+		w = std::make_shared<std::jthread>(sender);
+	}
+
+	std::array<std::shared_ptr<std::jthread>, 4> recvers;
+	for(auto& w: recvers) {
+		w = std::make_shared<std::jthread>(recver);
+	}
+
+	l.unlock();
+	for(auto& w: senders) {
+		w->join();
+	}
+
+	while(chan->size() != -recvers.size()) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+
+	chan->close();
+	for(auto w: recvers) {
+		w->join();
+	}
+
+	REQUIRE(std::all_of(marks.begin(), marks.end(), [](bool v) { return v == 1; }));
 }

@@ -34,7 +34,6 @@ class bounded_channel: public chan<T> {
 	std::intmax_t size() const override {
 		std::scoped_lock l(mutex_);
 
-		T v;
 		while(!hanged_recv_tasks.empty()) {
 			if(!hanged_recv_tasks.front().need_abort()) {
 				break;
@@ -51,9 +50,11 @@ class bounded_channel: public chan<T> {
 
 				hanged_send_tasks.pop();
 			}
-		}
 
-		return buffer_.size() + hanged_send_tasks.size() - hanged_recv_tasks.size();
+			return static_cast<std::intmax_t>(buffer_.size()) - hanged_recv_tasks.size() + hanged_send_tasks.size();
+		} else {
+			return static_cast<std::intmax_t>(buffer_.size()) - hanged_recv_tasks.size();
+		}
 	}
 
 	constexpr std::size_t capacity() const noexcept override {
@@ -216,8 +217,6 @@ class bounded_channel: public chan<T> {
 
 		if constexpr(Cap != 0) {
 			if(!buffer_.empty()) {
-				assert(Cap > 0);
-
 				value = std::move(buffer_.front());
 				buffer_.pop();
 
@@ -238,12 +237,10 @@ class bounded_channel: public chan<T> {
 
 				return true;
 			}
-		}
-
-		if constexpr(Cap != unbounded_capacity) {
+		} else {
+			// If the capacity is not 0, there can be no hanged send tasks.
+			// If there is, the buffer is not empty, so the execution would have already been done before.
 			if(!hanged_send_tasks.empty()) {
-				assert(Cap == 0);
-
 				while(!hanged_send_tasks.empty()) {
 					assert(buffer_.size() >= Cap);
 
@@ -286,9 +283,7 @@ class bounded_channel: public chan<T> {
 
 		if constexpr(Cap == 0) {
 			return false;
-		}
-
-		if constexpr(Cap != unbounded_capacity) {
+		} else if constexpr(Cap != unbounded_capacity) {
 			if(buffer_.size() >= Cap) {
 				return false;
 			}
@@ -305,16 +300,17 @@ class bounded_channel: public chan<T> {
 
 		if(is_closed_) [[unlikely]] {
 			ec = channel_errc::closed;
+			return;
+		}
+
+		if constexpr(Cap == unbounded_capacity) {
+			try_send_(std::forward<U>(value));
+			ec = channel_errc::ok;
 		} else {
-			if constexpr(Cap == unbounded_capacity) {
-				try_send_(std::forward<U>(value));
+			if(try_send_(std::forward<U>(value))) {
 				ec = channel_errc::ok;
 			} else {
-				if(try_send_(std::forward<U>(value))) {
-					ec = channel_errc::ok;
-				} else {
-					ec = channel_errc::exhausted;
-				}
+				ec = channel_errc::exhausted;
 			}
 		}
 	}
