@@ -36,6 +36,16 @@ struct sched_context {
 template<typename T>
 class recv: public detail::op {
    public:
+	/**
+	 * @brief Extracts the first element from the buffer. 
+	 * 
+	 * Callback function is called if the value is received or the channel is closed.
+	 * The first argument of the callback function is \a true if the value is received,
+	 * or \a false if the channel is closed.
+	 * 
+	 * @param chan 
+	 * @param on_settle 
+	 */
 	template<typename F = std::function<void(bool, T&&)>>
 	recv(
 	    receiver<T>& chan, F&& on_settle = [](bool, T&&) {})
@@ -70,6 +80,16 @@ class recv: public detail::op {
 template<typename T, typename I>
 class send: public detail::op {
    public:
+	/**
+	 * @brief Appends the first element from the buffer. 
+	 * 
+	 * Callback function is called if the value is sent or the channel is closed.
+	 * The first argument of the callback function is \a true if the value is sent,
+	 * or \a false if the channel is closed.
+	 * 
+	 * @param chan 
+	 * @param on_settle 
+	 */
 	send(
 	    sender<T>& chan, I&& value, std::function<void(bool)> on_settle = [](bool) {})
 	    : chan_(chan)
@@ -103,6 +123,17 @@ class send: public detail::op {
 template<class T>
 send(sender<T>& chan, char const* value, std::function<void(bool)> const& on_settle) -> send<T, std::string>;
 
+/**
+ * @brief Waits for the given channel operations and cancels the other when one completes.
+ * 
+ * \ref fallback will be called if all operations are not ready or all the operations are canceled.
+ * If \ref fallback is \a nullptr, it is blocked until one of channel operation is completes.
+ * 
+ * @tparam Ops Operations.
+ * @param token Interrupt register.
+ * @param ops Operations to wait.
+ * @param fallback Fallback function.
+ */
 template<typename... Ops>
 requires std::conjunction_v<std::is_base_of<detail::op, Ops>...>
 void select(std::stop_token token, Ops... ops, std::function<void()> const& fallback) {
@@ -171,18 +202,41 @@ void select(std::stop_token token, Ops... ops, std::function<void()> const& fall
 	std::scoped_lock wait(done);
 }
 
+/**
+ * @brief Waits for the given channel operations and cancels the other when one completes.
+ * 
+ * @tparam Ops Operations.
+ * @param ops Operations to wait.
+ */
 template<typename... Ops>
 requires std::conjunction_v<std::is_base_of<detail::op, Ops>...>
 void select(Ops&&... ops) {
 	select<Ops...>(std::stop_token{}, std::forward<Ops>(ops)..., nullptr);
 }
 
+/**
+ * @brief Waits for the given channel operations and cancels the other when one completes.
+ * 
+ * @tparam Ops Operations.
+ * @param token Interrupt register.
+ * @param ops Operations to wait.
+ */
 template<typename... Ops>
 requires std::conjunction_v<std::is_base_of<detail::op, Ops>...>
 void select(std::stop_token token, Ops&&... ops) {
 	select<Ops...>(token, std::forward<Ops>(ops)..., nullptr);
 }
 
+/**
+ * @brief Waits for the given channel operations and cancels the other when one completes.
+ * 
+ * \ref fallback will be called if all operations are not ready or all the operations are canceled.
+ * If \ref fallback is \a nullptr, it is blocked until one of channel operation is completes.
+ * 
+ * @tparam Ops Operations.
+ * @param ops Operations to wait.
+ * @param fallback Fallback function.
+ */
 template<typename... Ops>
 requires std::conjunction_v<std::is_base_of<detail::op, Ops>...>
 void select(Ops&&... ops, std::function<void()> const& fallback) {

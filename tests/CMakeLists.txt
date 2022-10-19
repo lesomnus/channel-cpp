@@ -33,7 +33,10 @@ macro (LESOMNUS_CHANNEL_TEST NAME)
 			Catch2::Catch2WithMain
 			lesomnus::channel
 	)
-	catch_discover_tests(${NAME}_test)
+	catch_discover_tests(
+		${NAME}_test
+			EXTRA_ARGS --skip-benchmarks
+	)
 endmacro (LESOMNUS_CHANNEL_TEST)
 
 LESOMNUS_CHANNEL_TEST(channel)

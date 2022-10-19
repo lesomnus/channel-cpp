@@ -232,6 +232,8 @@ class bounded_channel: public chan<T> {
 
 						T& v = buffer_.emplace();
 						task.execute(true, v);
+
+						break;
 					}
 				}
 
