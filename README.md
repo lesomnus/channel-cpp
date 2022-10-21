@@ -1,5 +1,9 @@
 # channel
 
+[![test](https://github.com/lesomnus/channel-cpp/actions/workflows/test.yaml/badge.svg)](https://github.com/lesomnus/channel-cpp/actions/workflows/test.yaml)
+[![codecov](https://codecov.io/github/lesomnus/channel-cpp/branch/main/graph/badge.svg?token=DbqDiCe09i)](https://codecov.io/github/lesomnus/channel-cpp)
+
+
 C++ implementation of [Go channel](https://go.dev/ref/spec#Channel_types).
 
 ## Usage

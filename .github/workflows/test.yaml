@@ -16,7 +16,6 @@ jobs:
           cmake \
             -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE \
             -DCMAKE_BUILD_TYPE:STRING=Debug \
-            -DCMAKE_C_COMPILER:FILEPATH=/usr/local/bin/gcc \
             -DCMAKE_CXX_COMPILER:FILEPATH=/usr/local/bin/g++ \
             -S. \
             -B./build \
