@@ -17,7 +17,7 @@ enable_testing()
 include(Catch)
 
 
-
+add_custom_target(all-test)
 macro (LESOMNUS_CHANNEL_TEST NAME)
 	add_executable(
 		${NAME}_test
@@ -36,6 +36,11 @@ macro (LESOMNUS_CHANNEL_TEST NAME)
 	catch_discover_tests(
 		${NAME}_test
 			EXTRA_ARGS --skip-benchmarks
+	)
+
+	add_dependencies(
+		all-test
+			${NAME}_test
 	)
 endmacro (LESOMNUS_CHANNEL_TEST)
 
