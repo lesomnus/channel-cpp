@@ -20,12 +20,12 @@ class chan_base {
 	 * 
 	 * It can be negative or greater than its capacity if receiver or sender hangs.
 	 */
-	virtual std::ptrdiff_t size() const = 0;
+	[[nodiscard]] virtual std::ptrdiff_t size() const = 0;
 
 	/**
 	 * @brief Returns the number of elements that can be held.
 	 */
-	virtual std::size_t capacity() const = 0;
+	[[nodiscard]] virtual std::size_t capacity() const = 0;
 
 	/**
 	 * @brief Closes the channel and release holding operations.

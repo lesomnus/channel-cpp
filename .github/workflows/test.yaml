@@ -1,0 +1,40 @@
+name: test
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    container: ghcr.io/lesomnus/dev-gcc:12
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure
+        run: |
+          cmake \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE \
+            -DCMAKE_BUILD_TYPE:STRING=Debug \
+            -DCMAKE_CXX_COMPILER:FILEPATH=/usr/local/bin/g++ \
+            -S. \
+            -B./build \
+            -G Ninja
+
+      - name: Build
+        run: |
+          cmake \
+            --build ./build \
+            --config Debug \
+            --target all-test
+
+      - name: Test
+        run: |
+          cmake \
+            --build ./build \
+            --config Debug \
+            --target coverage
+
+      - uses: codecov/codecov-action@v3
+        with:
+          files: ./build/coverage.info
