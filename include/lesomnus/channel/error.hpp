@@ -17,11 +17,11 @@ namespace detail {
 
 class channel_category: public std::error_category {
    public:
-	const char* name() const noexcept override final {
+	[[nodiscard]] char const* name() const noexcept final {
 		return "channel_error";
 	}
 
-	std::string message(int c) const override final {
+	[[nodiscard]] std::string message(int c) const final {
 		switch(static_cast<channel_errc>(c)) {
 		case channel_errc::ok:
 			return "channel operation successful";
@@ -59,7 +59,7 @@ std::error_category const& channel_category() noexcept {
 }
 
 inline std::error_code make_error_code(lesomnus::channel::channel_errc e) noexcept {
-	return std::error_code(static_cast<int>(e), lesomnus::channel::channel_category());
+	return {static_cast<int>(e), lesomnus::channel::channel_category()};
 }
 
 }  // namespace channel
