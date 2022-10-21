@@ -8,7 +8,7 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     container:
-      image: lesomnus/dev-gcc:12
+      image: ghcr.io/lesomnus/dev-gcc:12
       options: --user hypnos
     steps:
       - uses: actions/checkout@v3
